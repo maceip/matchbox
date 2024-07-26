@@ -3,17 +3,21 @@
 # to build, run `docker build -f matchbox_server/Dockerfile` from root of the
 # repository
 
-FROM rust:1.79-slim-bullseye AS builder
+FROM  ubuntu:22.04 AS builder
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LC_ALL=C.UTF-8
+ENV LANG=C.UTF-8
+RUN apt-get update \
+    && apt-get install -y vim nano git curl gcc ninja-build cmake libudev-dev python3 python3-pip libusb-1.0-0 libssl-dev \
+    pkg-config libtinfo5
 
 WORKDIR /usr/src/matchbox_server/
-
 COPY README.md /usr/src/README.md
 COPY matchbox_server/Cargo.toml /usr/src/matchbox_server/Cargo.toml
 COPY matchbox_protocol /usr/src/matchbox_protocol
 COPY matchbox_server /usr/src/matchbox_server
 COPY matchbox_signaling /usr/src/matchbox_signaling
-RUN apt-get update && apt-get install -y \
-    libssl1.1 \
+RUN  apt-get update &&  apt-get upgrade &&   apt-get install -y \
     libssl-dev \
     tpm2-tools \
     libtss2-dev \
@@ -34,17 +38,18 @@ RUN apt-get update && apt-get install -y \
     libprotobuf-c-dev \
     protobuf-compiler \
     libc6 \
+    libc6-dev \ 
     git
 
 
-RUN wget https://download.01.org/intel-sgx/latest/dcap-latest/linux/distro/Debian12/sgx_linux_x64_sdk_2.24.100.3.bin
-RUN chmod +x sgx_linux_x64_sdk_2.24.100.3.bin
-RUN yes '/opt/intel' | ./sgx_linux_x64_sdk_2.24.100.3.bin
-RUN . /opt/intel/sgxsdk/environment
+RUN git clone https://github.com/intel/linux-sgx
+RUN make -C linux-sgx/ sdk
+RUN make -C linux-sgx/ psw
+run mace -C linux-sgx/ install
 RUN git clone https://github.com/intel/SGXDataCenterAttestationPrimitives
 RUN cd SGXDataCenterAttestationPrimitives/; git submodule update --init --recursive
 RUN ./SGXDataCenterAttestationPrimitives/QuoteGeneration/download_prebuilt.sh
-RUN make -C ./SGXDataCenterAttestationPrimitives/QuoteGeneration/
+RUN make -C ./SGXDataCenterAttestationPrimitives/
 RUN make -C ./SGXDataCenterAttestationPrimitives/QuoteGeneration deb_pkg;
 RUN dpkg -i --force-overwrite SGXDataCenterAttestationPrimitives/QuoteGeneration/installer/linux/deb/*.deb
 
