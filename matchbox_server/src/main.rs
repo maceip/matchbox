@@ -7,11 +7,14 @@ use crate::{
     topology::MatchmakingDemoTopology,
 };
 use args::Args;
-use axum::{http::StatusCode, response::IntoResponse, routing::get};
+use axum::{http::StatusCode, response::IntoResponse, routing::get,  Json};
 use clap::Parser;
 use matchbox_signaling::SignalingServerBuilder;
 use tracing::info;
 use tracing_subscriber::prelude::*;
+use tee_attestation::{get_quote, guess_tee, TeeType};
+use serde_json::json;
+
 
 fn setup_logging() {
     tracing_subscriber::registry()
@@ -30,6 +33,8 @@ fn setup_logging() {
 
 #[tokio::main]
 async fn main() {
+  
+
     setup_logging();
     let args = Args::parse();
 
@@ -60,6 +65,8 @@ async fn main() {
         .cors()
         .trace()
         .mutate_router(|router| router.route("/health", get(health_handler)))
+        .mutate_router(|router| router.route("/attestation", get(attestation_handler)))
+
         .build();
     server
         .serve()
@@ -69,4 +76,33 @@ async fn main() {
 
 pub async fn health_handler() -> impl IntoResponse {
     StatusCode::OK
+}
+
+pub async fn attestation_handler() -> impl IntoResponse {
+    let tee_type = guess_tee().unwrap();
+    let raw_quote = get_quote(None).unwrap();
+
+    match tee_type {
+        TeeType::AzSev | TeeType::Sev => {
+            let quote = sev_quote::quote::parse_quote(&raw_quote).unwrap();
+            println!(
+                "AMD SEV-SNP found:\n{}",
+                 quote.report
+            );
+            return (StatusCode::OK, Json(json!({"quote": raw_quote}))).into_response();
+
+        }
+        TeeType::Tdx | TeeType::AzTdx => {
+            let (quote, _) = tdx_quote::quote::parse_quote(&raw_quote).unwrap();
+            println!("Intel TDX found:\n{}", quote);
+            return (StatusCode::OK, Json(json!({"quote": raw_quote}))).into_response();
+
+        }
+        TeeType::Sgx => {
+            let (quote, _, _, _) = sgx_quote::quote::parse_quote(&raw_quote).unwrap();
+            println!("Intel SGX found:\n{}", quote);
+            return (StatusCode::OK, Json(json!({"quote": raw_quote}))).into_response();
+        }
+    }
+
 }

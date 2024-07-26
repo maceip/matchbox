@@ -21,6 +21,13 @@ matchbox_signaling = { version = "0.10", path = "../matchbox_signaling" }
 matchbox_protocol = { version = "0.10", path = "../matchbox_protocol", features = [
   "json",
 ] }
+
+# these tee-tools crates require you to have compiled -> github.com/intel/SGXDataCenterAttestationPrimitives
+tdx_quote = {  git = "https://github.com/Cosmian/tee-tools"}
+sgx_quote = {  git = "https://github.com/Cosmian/tee-tools"}
+sev_quote = { git = "https://github.com/Cosmian/tee-tools.git"}
+tee_attestation = { git = "https://github.com/Cosmian/tee-tools.git"}
+
 async-trait = "0.1"
 axum = { version = "0.7", features = ["ws"] }
 tracing = { version = "0.1", features = ["log"] }
